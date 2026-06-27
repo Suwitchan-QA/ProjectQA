@@ -180,6 +180,37 @@ body { background: #0a0c16; color: #e2e8f0; height: 100vh; overflow: hidden; }
 .ei { font-size: 28px; margin-bottom: 8px; }
 .et { font-size: 11px; color: #374151; }
 
+/* Email modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal { background: #111827; border: 1px solid #374151; border-radius: 14px; width: 540px; max-width: 95vw; overflow: hidden; transform: translateY(16px); transition: transform .2s; }
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal-head { background: #1e1b4b; padding: 20px 24px; display: flex; align-items: flex-start; gap: 14px; }
+.modal-head-icon { font-size: 28px; flex-shrink: 0; }
+.modal-head-text h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.modal-head-text p  { font-size: 12px; color: #a5b4fc; }
+.modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.email-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.email-chip { background: #0f1117; border: 1px solid #1f2937; border-radius: 8px; padding: 10px 12px; }
+.ec-label { font-size: 9px; color: #4b5563; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 4px; }
+.ec-value { font-size: 12px; font-weight: 600; color: #e5e7eb; }
+.email-to-box { background: #0f1117; border: 1px solid #7c3aed33; border-radius: 8px; padding: 12px 14px; }
+.etb-label { font-size: 10px; font-weight: 700; color: #a78bfa; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.etb-recipients { display: flex; flex-direction: column; gap: 6px; }
+.etb-rec { display: flex; align-items: center; gap: 8px; background: #1a1530; border: 1px solid #7c3aed22; border-radius: 6px; padding: 7px 10px; }
+.etb-avatar { width: 24px; height: 24px; border-radius: 50%; background: #7c3aed33; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a78bfa; flex-shrink: 0; }
+.etb-email { font-size: 12px; color: #c4b5fd; font-weight: 500; }
+.email-reason-box { background: #3b000015; border: 1px solid #ef444433; border-radius: 8px; padding: 12px 14px; }
+.erb-label { font-size: 10px; font-weight: 700; color: #f87171; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.erb-text { font-size: 12px; color: #fca5a5; line-height: 1.6; }
+.email-status { display: flex; align-items: center; gap: 10px; background: #14532d15; border: 1px solid #22c55e33; border-radius: 8px; padding: 12px 14px; }
+.es-icon { font-size: 20px; }
+.es-text .est { font-size: 12px; font-weight: 700; color: #4ade80; }
+.es-text .esd { font-size: 11px; color: #166534; margin-top: 2px; }
+.modal-foot { padding: 14px 24px; border-top: 1px solid #1f2937; display: flex; justify-content: flex-end; }
+.btn-close-modal { background: #374151; color: #d1d5db; border: none; border-radius: 7px; padding: 8px 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.btn-close-modal:hover { background: #4b5563; }
+
 .notif { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; }
 .notif.show { opacity: 1; }
 .n-ok  { background: #14532dcc; color: #4ade80; border: 1px solid #22c55e44; }
@@ -229,6 +260,50 @@ body { background: #0a0c16; color: #e2e8f0; height: 100vh; overflow: hidden; }
 </div>
 </div>
 <div class="notif" id="notif"></div>
+
+<!-- Email Modal -->
+<div class="modal-overlay" id="emailModal" onclick="closeEmailModal(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-icon">📧</div>
+      <div class="modal-head-text">
+        <h3>Rejection Notification Sent</h3>
+        <p id="modalSubject">QA Pipeline Rejected — Stage X</p>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="email-info-grid" id="modalInfoGrid"></div>
+      <div class="email-to-box">
+        <div class="etb-label">📬 Recipients</div>
+        <div class="etb-recipients">
+          <div class="etb-rec">
+            <div class="etb-avatar">S</div>
+            <div class="etb-email">suwitchan.c@tidlor.com</div>
+          </div>
+          <div class="etb-rec">
+            <div class="etb-avatar">N</div>
+            <div class="etb-email">napat.wa@tidlor.com</div>
+          </div>
+        </div>
+      </div>
+      <div class="email-reason-box">
+        <div class="erb-label">❌ Reason for Rejection</div>
+        <div class="erb-text" id="modalReason"></div>
+      </div>
+      <div class="email-status">
+        <div class="es-icon">✅</div>
+        <div class="es-text">
+          <div class="est">Email delivered successfully</div>
+          <div class="esd" id="modalTime"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-close-modal" onclick="closeEmailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const ST=[
   {name:"Validate\nRequirement",emoji:"📋",tools:"Jira · Confluence",short:"Validate Req"},
@@ -365,8 +440,11 @@ function doReject(si){
   run.stages[si].s="rejected";run.stages[si].reason=reason;run.stages[si].by=run.approver;
   run.status="rejected";
   run.activity.push({t:"rej",h:`Gate ${si+1} REJECTED`,d:reason,m:now});
+  run.activity.push({t:"email",h:"📧 Rejection email sent",d:"suwitchan.c@tidlor.com, napat.wa@tidlor.com",m:now});
   run.comments.push({stage:si+1,by:run.approver,text:reason,time:now});
-  render();showNotif(`❌ Stage ${si+1} rejected`,"err");
+  render();
+  showEmailModal(run, si+1, ST[si].short, reason, now);
+  showNotif(`❌ Stage ${si+1} rejected — email sent`,"err");
 }
 
 function doCmtApprove(si){
@@ -395,11 +473,32 @@ function sLabel(s){return{approved:"✓ Approved",gate_pending:"⏸ Gate",runnin
 function fcc(s){return{approved:"fc-done",running:"fc-active",gate_pending:"fc-gate",rejected:"fc-reject",waiting:"fc-wait"}[s]||"fc-wait";}
 function fnc(s){return{approved:"fn-name-done",running:"fn-name-active",gate_pending:"fn-name-gate",rejected:"fn-name-reject",waiting:"fn-name-wait"}[s]||"fn-name-wait";}
 function fNumCol(s){return{approved:"#4ade80",running:"#60a5fa",gate_pending:"#fb923c",rejected:"#f87171",waiting:"#374151"}[s]||"#374151";}
-function aIcon(t){return{ok:"✅",rej:"❌",cmt:"💬",run:"▶️"}[t]||"📌";}
+function aIcon(t){return{ok:"✅",rej:"❌",cmt:"💬",run:"▶️",email:"📧"}[t]||"📌";}
 function vCls(k,v){if(v==="true")return"ov-ok";if(v==="false")return"ov-bad";if(/(score|passed)/.test(k)&&Number(v)>0)return"ov-ok";if(/(fail|bug|rej|issue)/.test(k))return"ov-bad";if(/(rate|decision|cond)/.test(k))return"ov-warn";if(/(id|plan|page|progress)/.test(k))return"ov-info";return"ov-neu";}
 function mockOut(i){return[{testability_score:9,issues:0,ready:"true"},{total_cases:10,types:"pos/neg/edge"},{passed:9,failed:1,pass_rate:"90%",bugs:"BUG-AUTO"},{decision:"APPROVED",pass_rate:"90%"}][i]||{};}
 function emptyEl(i,t){return`<div class="empty"><div class="ei">${i}</div><div class="et">${t}</div></div>`;}
 function showNotif(msg,type){const el=document.getElementById("notif");el.textContent=msg;el.className=`notif n-${type} show`;setTimeout(()=>el.classList.remove("show"),3000);}
+
+function showEmailModal(run, stage, stageName, reason, time) {
+  document.getElementById("modalSubject").textContent =
+    `[QA REJECTED] ${run.project} v${run.version} — Stage ${stage}: ${stageName} (${run.jira})`;
+  document.getElementById("modalReason").textContent = reason;
+  document.getElementById("modalTime").textContent =
+    `Sent to 2 recipients at ${time} · Run: ${run.id}`;
+  document.getElementById("modalInfoGrid").innerHTML = `
+    <div class="email-chip"><div class="ec-label">Run ID</div><div class="ec-value">${run.id}</div></div>
+    <div class="email-chip"><div class="ec-label">Jira Issue</div><div class="ec-value">${run.jira}</div></div>
+    <div class="email-chip"><div class="ec-label">Rejected Stage</div><div class="ec-value">Stage ${stage}: ${stageName}</div></div>
+    <div class="email-chip"><div class="ec-label">Rejected By</div><div class="ec-value">${run.approver}</div></div>
+    <div class="email-chip"><div class="ec-label">Project</div><div class="ec-value">${run.project}</div></div>
+    <div class="email-chip"><div class="ec-label">Version</div><div class="ec-value">${run.version}</div></div>`;
+  document.getElementById("emailModal").classList.add("show");
+}
+
+function closeEmailModal(e) {
+  if (e && e.target !== document.getElementById("emailModal")) return;
+  document.getElementById("emailModal").classList.remove("show");
+}
 
 render();
 </script>

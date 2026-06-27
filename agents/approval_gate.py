@@ -7,6 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from skills.email_skill import send_rejection_email
+
 GATE_LOG = Path("approval_log.json")
 
 GREEN  = "\033[0;32m"
@@ -23,10 +25,13 @@ class ApprovalGate:
     Returns True if approved, raises SystemExit if rejected.
     """
 
-    def __init__(self, project: str, version: str, approver: str = "QA Lead"):
-        self.project = project
-        self.version = version
+    def __init__(self, project: str, version: str, approver: str = "QA Lead",
+                 run_id: str = "", jira: str = ""):
+        self.project  = project
+        self.version  = version
         self.approver = approver
+        self.run_id   = run_id
+        self.jira     = jira
         self._log: list[dict] = []
 
     def request(self, stage: int, name: str, summary: str, details: dict = None) -> bool:
@@ -87,6 +92,18 @@ class ApprovalGate:
                 self._print_rejected(stage, name, reason)
                 self._record(stage, name, "REJECTED", reason)
                 self._save_log()
+                # ── Send rejection email ──────────────────────
+                print(f"  📧 Sending rejection notification...")
+                send_rejection_email(
+                    stage=stage,
+                    stage_name=name,
+                    project=self.project,
+                    version=self.version,
+                    jira=self.jira or "N/A",
+                    reason=reason,
+                    approver=self.approver,
+                    run_id=self.run_id or "N/A",
+                )
                 print(f"\n{RED}  Pipeline stopped at Stage {stage}: {name}{NC}\n")
                 sys.exit(0)
 
