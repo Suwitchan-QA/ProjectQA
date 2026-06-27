@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>QA Workflow Monitor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+  body { background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .topbar { background: #1a1d2e; border-bottom: 1px solid #2d3148; display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+  .topbar h1 { font-size: 15px; font-weight: 700; color: #a78bfa; letter-spacing: .5px; }
+  .topbar .badge { font-size: 11px; background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed55; border-radius: 20px; padding: 2px 10px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .project-tag { font-size: 12px; color: #64748b; }
+  .topbar .project-tag span { color: #94a3b8; font-weight: 600; }
+  .main { display: grid; grid-template-columns: 260px 1fr 340px; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar { background: #13162b; border-right: 1px solid #1e2340; overflow-y: auto; padding: 12px 0; }
+  .sidebar-section { padding: 8px 16px 4px; font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 1px; text-transform: uppercase; }
+  .run-item { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; transition: all .15s; }
+  .run-item:hover { background: #1e2340; }
+  .run-item.active { background: #1e2340; border-left-color: #7c3aed; }
+  .run-item .run-id { font-size: 12px; font-weight: 600; color: #cbd5e1; }
+  .run-item .run-meta { font-size: 11px; color: #475569; margin-top: 2px; }
+  .run-item .run-status { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; margin-top: 4px; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+  .status-running { background: #1d4ed822; color: #60a5fa; }
+  .status-pending { background: #d9770622; color: #fb923c; }
+  .status-approved { background: #16653122; color: #4ade80; }
+  .status-rejected { background: #99181822; color: #f87171; }
+
+  /* Center */
+  .center { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .pipeline-header { display: flex; align-items: center; gap: 12px; }
+  .pipeline-header h2 { font-size: 16px; font-weight: 700; color: #e2e8f0; }
+  .pipeline-header .ph-meta { font-size: 12px; color: #64748b; }
+  .btn-new { margin-left: auto; background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-new:hover { background: #6d28d9; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; background: #13162b; border: 1px solid #1e2340; border-radius: 12px; padding: 16px 20px; overflow-x: auto; }
+  .flow-stage { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 100px; }
+  .flow-dot { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; border: 2px solid; transition: all .2s; cursor: pointer; }
+  .dot-done   { background: #16653133; border-color: #4ade80; color: #4ade80; }
+  .dot-active { background: #1d4ed833; border-color: #60a5fa; color: #60a5fa; animation: pulse 2s infinite; }
+  .dot-gate   { background: #d9770622; border-color: #fb923c; color: #fb923c; }
+  .dot-wait   { background: #1e234033; border-color: #334155; color: #475569; }
+  .dot-reject { background: #99181822; border-color: #f87171; color: #f87171; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .flow-label { font-size: 10px; color: #64748b; text-align: center; white-space: nowrap; }
+  .flow-label.active-label { color: #60a5fa; font-weight: 600; }
+  .flow-arrow { font-size: 16px; color: #334155; padding: 0 6px; margin-bottom: 20px; }
+  .flow-gate-label { font-size: 9px; color: #fb923c; font-weight: 600; }
+
+  /* Stage cards */
+  .stage-card { background: #13162b; border: 1px solid #1e2340; border-radius: 12px; overflow: hidden; }
+  .stage-card.gate-pending { border-color: #d9770655; }
+  .stage-card.stage-done { border-color: #16653133; }
+  .stage-card.stage-rejected { border-color: #99181855; }
+  .sc-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #1e2340; cursor: pointer; user-select: none; }
+  .sc-num { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .num-done   { background: #16653133; color: #4ade80; }
+  .num-active { background: #1d4ed833; color: #60a5fa; }
+  .num-gate   { background: #d9770622; color: #fb923c; }
+  .num-wait   { background: #1e2340;   color: #475569; }
+  .num-reject { background: #99181822; color: #f87171; }
+  .sc-title { font-size: 13px; font-weight: 600; color: #cbd5e1; }
+  .sc-pill { font-size: 10px; font-weight: 700; border-radius: 20px; padding: 2px 8px; margin-left: auto; }
+  .pill-done     { background: #16653122; color: #4ade80; }
+  .pill-running  { background: #1d4ed822; color: #60a5fa; }
+  .pill-gate     { background: #d9770622; color: #fb923c; }
+  .pill-waiting  { background: #1e234055; color: #475569; }
+  .pill-rejected { background: #99181822; color: #f87171; }
+  .sc-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .output-box { background: #0f1117; border: 1px solid #1e2340; border-radius: 8px; padding: 10px 12px; font-size: 11px; color: #94a3b8; line-height: 1.6; max-height: 120px; overflow-y: auto; }
+  .output-box .key { color: #a78bfa; font-weight: 600; }
+  .output-box .val-ok  { color: #4ade80; }
+  .output-box .val-bad { color: #f87171; }
+  .meta-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .meta-chip { font-size: 11px; color: #64748b; }
+  .meta-chip span { color: #94a3b8; font-weight: 600; }
+
+  /* Gate bar */
+  .gate-bar { background: #1a1530; border: 1px solid #d9770644; border-radius: 8px; padding: 12px 14px; }
+  .gate-bar-title { font-size: 11px; font-weight: 700; color: #fb923c; margin-bottom: 8px; }
+  .gate-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-approve { background: #16653133; color: #4ade80; border: 1px solid #16653166; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; }
+  .btn-approve:hover { background: #16653166; }
+  .btn-reject  { background: #99181822; color: #f87171; border: 1px solid #99181855; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .btn-reject:hover  { background: #99181855; }
+  .btn-comment { background: #1e234066; color: #94a3b8; border: 1px solid #334155; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .btn-comment:hover { background: #1e2340; }
+  .comment-box { margin-top: 8px; display: none; }
+  .comment-box textarea { width: 100%; background: #0f1117; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 12px; padding: 8px 10px; resize: vertical; min-height: 60px; outline: none; }
+  .comment-box textarea:focus { border-color: #7c3aed; }
+  .comment-box-actions { display: flex; gap: 8px; margin-top: 6px; justify-content: flex-end; }
+  .btn-send { background: #7c3aed; color: #fff; border: none; border-radius: 6px; padding: 5px 14px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .btn-cancel { background: none; color: #64748b; border: none; font-size: 11px; cursor: pointer; padding: 5px 8px; }
+
+  /* Right panel */
+  .right-panel { background: #13162b; border-left: 1px solid #1e2340; overflow-y: auto; display: flex; flex-direction: column; }
+  .rp-tabs { display: flex; border-bottom: 1px solid #1e2340; }
+  .rp-tab { flex: 1; text-align: center; padding: 10px; font-size: 12px; font-weight: 600; color: #475569; cursor: pointer; border-bottom: 2px solid transparent; }
+  .rp-tab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
+  .rp-content { flex: 1; overflow-y: auto; padding: 14px; }
+  .activity-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1e2340; }
+  .activity-item:last-child { border-bottom: none; }
+  .act-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .act-approved { background: #16653133; }
+  .act-rejected { background: #99181822; }
+  .act-comment  { background: #1d4ed822; }
+  .act-running  { background: #d9770622; }
+  .act-body { flex: 1; }
+  .act-title { font-size: 12px; font-weight: 600; color: #cbd5e1; }
+  .act-desc  { font-size: 11px; color: #64748b; margin-top: 2px; line-height: 1.4; }
+  .act-time  { font-size: 10px; color: #334155; margin-top: 3px; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-card { background: #0f1117; border: 1px solid #1e2340; border-radius: 8px; padding: 12px; }
+  .stat-val { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: #475569; margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+  .stat-green { color: #4ade80; }
+  .stat-red   { color: #f87171; }
+  .stat-blue  { color: #60a5fa; }
+  .stat-orange { color: #fb923c; }
+  .empty { text-align: center; padding: 40px 20px; color: #334155; }
+  .empty .emoji { font-size: 32px; margin-bottom: 8px; }
+  .empty p { font-size: 12px; }
+  .notif { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .notif.show { opacity: 1; }
+  .notif-ok   { background: #16653199; color: #4ade80; border: 1px solid #4ade8055; }
+  .notif-err  { background: #99181899; color: #f87171; border: 1px solid #f8717155; }
+  .notif-info { background: #1d4ed899; color: #60a5fa; border: 1px solid #60a5fa55; }
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <span style="font-size:18px">🤖</span>
+    <h1>QA Workflow Monitor</h1>
+    <span class="badge">4-Agent Pipeline</span>
+    <div class="spacer"></div>
+    <div class="project-tag">Project: <span id="activeProject">ProjectQA v2.0</span></div>
+    <button class="btn-new" onclick="newRun()">+ New Run</button>
+  </div>
+  <div class="main">
+    <div class="sidebar"><div class="sidebar-section">Runs</div><div id="runList"></div></div>
+    <div class="center">
+      <div class="pipeline-header">
+        <h2 id="runTitle">Select a run</h2>
+        <div class="ph-meta" id="runMeta"></div>
+      </div>
+      <div class="flow" id="flowDiagram"></div>
+      <div id="stageCards"></div>
+    </div>
+    <div class="right-panel">
+      <div class="rp-tabs">
+        <div class="rp-tab active" onclick="switchTab('activity',this)">Activity</div>
+        <div class="rp-tab" onclick="switchTab('stats',this)">Stats</div>
+        <div class="rp-tab" onclick="switchTab('comments',this)">Comments</div>
+      </div>
+      <div class="rp-content" id="rpContent"></div>
+    </div>
+  </div>
+</div>
+<div class="notif" id="notif"></div>
+<script>
+const STAGES=[
+  {id:1,name:"Validate Requirement",icon:"📋",tools:"Jira, Confluence"},
+  {id:2,name:"Create Test Cases",icon:"✍️",tools:"Vansah, Confluence"},
+  {id:3,name:"Execute Test Cases",icon:"▶️",tools:"Playwright, Jira"},
+  {id:4,name:"UAT Signoff",icon:"📄",tools:"Confluence, Monday"},
+];
+let runs=[
+  {id:"RUN-20240627-001",project:"ProjectQA",version:"2.0",approver:"Suwitchan",startedAt:"2024-06-27 09:00",jira:"QA-123",status:"gate_pending",currentStage:1,
+   stages:[{status:"gate_pending",output:{req_id:"REQ-001",title:"User Login",testability_score:8,issues:1,ready:true},duration:"12s"},{status:"waiting"},{status:"waiting"},{status:"waiting"}],
+   activity:[{type:"running",title:"Pipeline started",desc:"Jira QA-123 → Agent 1",time:"09:00:05"},{type:"approved",title:"Agent 1 complete",desc:"Score: 8/10",time:"09:00:17"},{type:"comment",title:"Gate 1 reached",desc:"Waiting for approval",time:"09:00:17"}],comments:[]},
+  {id:"RUN-20240627-002",project:"ProjectQA",version:"2.0",approver:"Suwitchan",startedAt:"2024-06-27 08:30",jira:"QA-120",status:"running",currentStage:3,
+   stages:[{status:"approved",by:"Suwitchan",at:"08:31",output:{testability_score:9,issues:0,ready:true},duration:"11s"},{status:"approved",by:"Suwitchan",at:"08:34",output:{total_cases:12},duration:"2m 10s"},{status:"running",output:{progress:"7/12 tests"},duration:"..."},{status:"waiting"}],
+   activity:[{type:"approved",title:"Gate 1 APPROVED",desc:"Suwitchan",time:"08:31"},{type:"approved",title:"Gate 2 APPROVED",desc:"12 test cases",time:"08:34"},{type:"running",title:"Agent 3 running",desc:"7/12 tests done",time:"08:34"}],
+   comments:[{stage:1,by:"Suwitchan",text:"Clear requirement",time:"08:31"},{stage:2,by:"Suwitchan",text:"12 test cases look good",time:"08:34"}]},
+  {id:"RUN-20240626-003",project:"ProjectQA",version:"1.9",approver:"Suwitchan",startedAt:"2024-06-26 15:00",jira:"QA-115",status:"approved",currentStage:4,
+   stages:[{status:"approved",by:"Suwitchan",at:"15:01",output:{testability_score:10,issues:0,ready:true},duration:"9s"},{status:"approved",by:"Suwitchan",at:"15:05",output:{total_cases:8},duration:"4m"},{status:"approved",by:"Suwitchan",at:"15:20",output:{passed:7,failed:1,pass_rate:"87.5%",bugs:["BUG-044"]},duration:"15m"},{status:"approved",by:"Suwitchan",at:"15:25",output:{decision:"CONDITIONAL",pass_rate:"87.5%"},duration:"4m"}],
+   activity:[{type:"approved",title:"Gate 1-4 APPROVED",desc:"UAT: CONDITIONAL",time:"15:25"}],comments:[{stage:3,by:"Suwitchan",text:"BUG-044 must be fixed",time:"15:20"}]},
+  {id:"RUN-20240625-004",project:"ProjectQA",version:"1.8",approver:"Suwitchan",startedAt:"2024-06-25 10:00",jira:"QA-110",status:"rejected",currentStage:1,
+   stages:[{status:"rejected",by:"Suwitchan",at:"10:05",reason:"Missing AC — sent back to PO",output:{testability_score:3,issues:3,ready:false},duration:"10s"},{status:"waiting"},{status:"waiting"},{status:"waiting"}],
+   activity:[{type:"rejected",title:"Gate 1 REJECTED",desc:"Missing acceptance criteria",time:"10:05"}],comments:[{stage:1,by:"Suwitchan",text:"Testability score 3/10 — too risky",time:"10:05"}]},
+];
+let selectedRunId=runs[0].id,activeTab="activity",expandedStages={0:true};
+
+function render(){renderRunList();const r=runs.find(x=>x.id===selectedRunId);if(r)renderPipeline(r);renderRightPanel();}
+
+function renderRunList(){
+  document.getElementById("runList").innerHTML=runs.map(r=>`
+    <div class="run-item ${r.id===selectedRunId?'active':''}" onclick="selectRun('${r.id}')">
+      <div class="run-id">#${r.id.replace("RUN-","")}</div>
+      <div class="run-meta">${r.jira} · v${r.version}</div>
+      <div class="run-status ${sCls(r.status)}">${sIcon(r.status)} ${sLabel(r.status)}</div>
+    </div>`).join("");
+}
+
+function renderPipeline(run){
+  document.getElementById("runTitle").textContent=`${run.id} — ${run.jira}`;
+  document.getElementById("runMeta").textContent=`${run.project} v${run.version} · ${run.approver}`;
+  document.getElementById("activeProject").textContent=`${run.project} v${run.version}`;
+  let fd="";
+  run.stages.forEach((s,i)=>{
+    const st=STAGES[i],dc=dCls(s.status);
+    fd+=`<div class="flow-stage" onclick="toggleStage(${i})"><div class="flow-dot ${dc}">${dIcon(s.status,i+1)}</div>
+    <div class="flow-label ${s.status==='running'?'active-label':''}">${st.icon} ${st.name.split(" ").slice(0,2).join(" ")}</div>
+    <div class="flow-gate-label">${s.status==="gate_pending"?"⏸ GATE":"&nbsp;"}</div></div>`;
+    if(i<3)fd+=`<div class="flow-arrow">→</div>`;
+  });
+  document.getElementById("flowDiagram").innerHTML=fd;
+  document.getElementById("stageCards").innerHTML=run.stages.map((s,i)=>renderCard(s,i,run)).join("");
+}
+
+function renderCard(s,i,run){
+  const st=STAGES[i];
+  const nCls={gate_pending:"num-gate",approved:"num-done",running:"num-active",rejected:"num-reject",waiting:"num-wait"}[s.status]||"num-wait";
+  const pCls={gate_pending:"pill-gate",approved:"pill-done",running:"pill-running",rejected:"pill-rejected",waiting:"pill-waiting"}[s.status]||"pill-waiting";
+  const cCls=s.status==="gate_pending"?"gate-pending":s.status==="approved"?"stage-done":s.status==="rejected"?"stage-rejected":"";
+  const exp=expandedStages[i]!==false;
+  let body="";
+  if(exp){
+    const meta=`<div class="meta-row"><div class="meta-chip">Tools: <span>${st.tools}</span></div>${s.duration?`<div class="meta-chip">Duration: <span>${s.duration}</span></div>`:""} ${s.by?`<div class="meta-chip">By: <span>${s.by}</span></div>`:""}</div>`;
+    const out=s.output?`<div class="output-box">${Object.entries(s.output).map(([k,v])=>`<div><span class="key">${k}:</span> <span class="${vCls(k,v)}">${Array.isArray(v)?v.join(", "):String(v)}</span></div>`).join("")}</div>`:"";
+    const rej=s.status==="rejected"&&s.reason?`<div class="output-box" style="border-color:#99181855"><span class="val-bad">❌ Rejected:</span> ${s.reason}</div>`:"";
+    let gate="";
+    if(s.status==="gate_pending"&&run.id===selectedRunId)gate=`<div class="gate-bar"><div class="gate-bar-title">⏸ Approval Required — Gate ${i+1}</div><div class="gate-actions"><button class="btn-approve" onclick="doApprove(${i})">✅ Approve</button><button class="btn-reject" onclick="doReject(${i})">❌ Reject</button><button class="btn-comment" onclick="toggleComment(${i})">💬 Comment & Approve</button></div><div class="comment-box" id="commentBox-${i}"><textarea id="commentText-${i}" placeholder="เขียน comment ก่อน approve..."></textarea><div class="comment-box-actions"><button class="btn-cancel" onclick="toggleComment(${i})">Cancel</button><button class="btn-send" onclick="doCommentApprove(${i})">Send & Approve ✅</button></div></div></div>`;
+    body=`<div class="sc-body">${meta}${out}${rej}${gate}</div>`;
+  }
+  return `<div class="stage-card ${cCls}"><div class="sc-header" onclick="toggleStage(${i})"><div class="sc-num ${nCls}">${i+1}</div><div class="sc-title">${st.icon} ${st.name}</div><div class="sc-pill ${pCls}">${sLabel(s.status)}</div><div style="color:#334155;margin-left:6px;font-size:12px">${exp?"▲":"▼"}</div></div>${body}</div>`;
+}
+
+function renderRightPanel(){
+  const run=runs.find(r=>r.id===selectedRunId);
+  if(!run)return;
+  const el=document.getElementById("rpContent");
+  if(activeTab==="activity"){
+    el.innerHTML=!run.activity.length?`<div class="empty"><div class="emoji">📭</div><p>No activity</p></div>`:
+      run.activity.slice().reverse().map(a=>`<div class="activity-item"><div class="act-icon act-${a.type}">${aIcon(a.type)}</div><div class="act-body"><div class="act-title">${a.title}</div><div class="act-desc">${a.desc}</div><div class="act-time">${a.time}</div></div></div>`).join("");
+  }
+  if(activeTab==="stats"){
+    const t=runs.length,ap=runs.filter(r=>r.status==="approved").length,rj=runs.filter(r=>r.status==="rejected").length,ru=runs.filter(r=>["running","gate_pending"].includes(r.status)).length;
+    el.innerHTML=`<div class="stats-grid"><div class="stat-card"><div class="stat-val stat-blue">${t}</div><div class="stat-label">Total Runs</div></div><div class="stat-card"><div class="stat-val stat-green">${ap}</div><div class="stat-label">Approved</div></div><div class="stat-card"><div class="stat-val stat-red">${rj}</div><div class="stat-label">Rejected</div></div><div class="stat-card"><div class="stat-val stat-orange">${ru}</div><div class="stat-label">In Progress</div></div></div><div class="stat-card"><div class="stat-val stat-green">${Math.round(ap/t*100)}%</div><div class="stat-label">Approval Rate</div></div>`;
+  }
+  if(activeTab==="comments"){
+    el.innerHTML=!run.comments.length?`<div class="empty"><div class="emoji">💬</div><p>No comments</p></div>`:
+      run.comments.map(c=>`<div class="activity-item"><div class="act-icon act-comment">💬</div><div class="act-body"><div class="act-title">Stage ${c.stage} — ${c.by}</div><div class="act-desc">${c.text}</div><div class="act-time">${c.time}</div></div></div>`).join("");
+  }
+}
+
+function selectRun(id){selectedRunId=id;expandedStages={0:true};render();}
+function toggleStage(i){expandedStages[i]=!expandedStages[i];const r=runs.find(x=>x.id===selectedRunId);if(r)renderPipeline(r);}
+function toggleComment(i){const b=document.getElementById(`commentBox-${i}`);if(b)b.style.display=b.style.display==="block"?"none":"block";}
+function switchTab(tab,el){activeTab=tab;document.querySelectorAll(".rp-tab").forEach(t=>t.classList.remove("active"));el.classList.add("active");renderRightPanel();}
+
+function doApprove(si){
+  const run=runs.find(r=>r.id===selectedRunId);if(!run)return;
+  const now=new Date().toLocaleTimeString("th-TH");
+  run.stages[si].status="approved";run.stages[si].by=run.approver;run.stages[si].at=now;
+  run.activity.push({type:"approved",title:`Gate ${si+1} APPROVED`,desc:run.approver,time:now});
+  const ni=si+1;
+  if(ni<run.stages.length){
+    run.stages[ni].status="running";run.status="running";expandedStages[ni]=true;
+    render();showNotif(`✅ Stage ${si+1} approved — Agent ${ni+1} started`,"ok");
+    setTimeout(()=>{
+      if(ni<3){run.stages[ni].status="gate_pending";run.stages[ni].output=mockOut(ni);run.stages[ni].duration=`${Math.floor(Math.random()*3)+1}m`;}
+      else{run.stages[ni].status="approved";run.stages[ni].output={decision:"APPROVED",pass_rate:"97%"};run.status="approved";}
+      run.activity.push({type:ni<3?"comment":"approved",title:ni<3?`Gate ${ni+1} reached`:"UAT Complete",desc:ni<3?"Waiting for approval":"APPROVED",time:new Date().toLocaleTimeString("th-TH")});
+      render();
+    },2500);
+  }else{run.status="approved";render();}
+}
+
+function doReject(si){
+  const reason=prompt("Reason for rejection:");if(!reason)return;
+  const run=runs.find(r=>r.id===selectedRunId);if(!run)return;
+  const now=new Date().toLocaleTimeString("th-TH");
+  run.stages[si].status="rejected";run.stages[si].reason=reason;run.stages[si].by=run.approver;
+  run.status="rejected";
+  run.activity.push({type:"rejected",title:`Gate ${si+1} REJECTED`,desc:reason,time:now});
+  run.comments.push({stage:si+1,by:run.approver,text:reason,time:now});
+  render();showNotif(`❌ Stage ${si+1} rejected`,"err");
+}
+
+function doCommentApprove(si){
+  const text=document.getElementById(`commentText-${si}`)?.value?.trim();
+  if(!text){showNotif("Please enter a comment","info");return;}
+  const run=runs.find(r=>r.id===selectedRunId);if(!run)return;
+  const now=new Date().toLocaleTimeString("th-TH");
+  run.comments.push({stage:si+1,by:run.approver,text,time:now});
+  run.activity.push({type:"comment",title:`Comment on Stage ${si+1}`,desc:text,time:now});
+  doApprove(si);
+}
+
+function newRun(){
+  const jira=prompt("Enter Jira issue key (e.g. QA-200):");if(!jira)return;
+  const now=new Date(),id=`RUN-${now.toISOString().slice(0,10).replace(/-/g,"")}-${String(runs.length+1).padStart(3,"0")}`;
+  runs.unshift({id,project:"ProjectQA",version:"2.0",approver:"Suwitchan",startedAt:now.toLocaleString().slice(0,16),jira,status:"gate_pending",currentStage:1,
+    stages:[{status:"gate_pending",output:{req_id:`REQ-${runs.length+10}`,testability_score:8,issues:0,ready:true},duration:"11s"},{status:"waiting"},{status:"waiting"},{status:"waiting"}],
+    activity:[{type:"running",title:"Pipeline started",desc:`${jira} → Agent 1`,time:now.toLocaleTimeString()},{type:"comment",title:"Gate 1 reached",desc:"Waiting for approval",time:now.toLocaleTimeString()}],comments:[]});
+  selectedRunId=id;expandedStages={0:true};render();showNotif(`New run: ${id}`,"ok");
+}
+
+function sCls(s){return{running:"status-running",gate_pending:"status-pending",approved:"status-approved",rejected:"status-rejected"}[s]||"status-pending";}
+function sLabel(s){return{running:"Running",gate_pending:"⏸ Gate",approved:"Approved",rejected:"Rejected",waiting:"Waiting"}[s]||s;}
+function sIcon(s){return{running:"▶",gate_pending:"⏸",approved:"✓",rejected:"✗",waiting:"○"}[s]||"·";}
+function dCls(s){return{approved:"dot-done",running:"dot-active",gate_pending:"dot-gate",rejected:"dot-reject",waiting:"dot-wait"}[s]||"dot-wait";}
+function dIcon(s,n){return{approved:"✓",running:"▶",gate_pending:"⏸",rejected:"✗",waiting:n}[s]||n;}
+function aIcon(t){return{approved:"✅",rejected:"❌",comment:"💬",running:"▶️"}[t]||"📌";}
+function vCls(k,v){if(typeof v==="boolean")return v?"val-ok":"val-bad";if(/(pass|ready|score)/.test(k))return"val-ok";if(/(fail|bug|issue)/.test(k))return"val-bad";return"";}
+function mockOut(i){return[{testability_score:9,issues:0,ready:true},{total_cases:10},{passed:9,failed:1,pass_rate:"90%"},{decision:"APPROVED"}][i]||{};}
+function showNotif(msg,type){const el=document.getElementById("notif");el.textContent=msg;el.className=`notif notif-${type} show`;setTimeout(()=>el.classList.remove("show"),3000);}
+
+render();
+</script>
+</body>
+</html>
