@@ -1,0 +1,9 @@
+.env
+node_modules/
+test-results/
+jmeter-results/
+k6-results/
+playwright-report/
+__pycache__/
+*.pyc
+.DS_Store
