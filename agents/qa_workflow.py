@@ -45,7 +45,14 @@ def run_qa_workflow(
 ) -> dict:
 
     started_at = datetime.now()
-    gate = ApprovalGate(project=project_name, version=version, approver=approver_name)
+    run_id = f"RUN-{started_at.strftime('%Y%m%d%H%M%S')}"
+    gate = ApprovalGate(
+        project=project_name,
+        version=version,
+        approver=approver_name,
+        run_id=run_id,
+        jira=jira_issue or req_id or "N/A",
+    )
 
     print(f"\n{'#'*60}")
     print(f"  QA AUTOMATED WORKFLOW — {project_name} v{version}")
