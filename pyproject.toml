@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "projectqa"
+version = "1.0.0"
+description = "QA Automation Agent — Jira, Confluence, Vansah, Monday, Playwright, AS400, JMeter, K6, Postman"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "playwright>=1.44.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skills*", "tools*"]

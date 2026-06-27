@@ -1,0 +1,20 @@
+{
+  "name": "projectqa",
+  "version": "1.0.0",
+  "description": "QA Automation Agent — Playwright + tools integration",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "install:browsers": "playwright install chromium firefox",
+    "security:scan": "python scripts/security_scan.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Suwitchan-QA/ProjectQA.git"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
