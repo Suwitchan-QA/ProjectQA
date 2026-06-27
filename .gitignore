@@ -1,9 +1,58 @@
+# ============================================================
+# SECRETS & CREDENTIALS — never commit these
+# ============================================================
 .env
-node_modules/
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/
+private/
+
+# ============================================================
+# TEST RESULTS & REPORTS (may contain sensitive data)
+# ============================================================
 test-results/
 jmeter-results/
 k6-results/
 playwright-report/
+allure-results/
+allure-report/
+reports/
+
+# ============================================================
+# LOGS (may contain tokens, passwords, PII)
+# ============================================================
+logs/
+*.log
+npm-debug.log*
+
+# ============================================================
+# DEPENDENCIES
+# ============================================================
+node_modules/
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+
+# ============================================================
+# OS & EDITOR
+# ============================================================
 .DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+
+# ============================================================
+# PLAYWRIGHT ARTIFACTS (screenshots may contain sensitive UI)
+# ============================================================
+test-results/screenshots/
+videos/
+traces/
