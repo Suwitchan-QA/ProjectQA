@@ -1,3 +1,4 @@
+import json
 import requests
 from config import MONDAY_API_TOKEN
 
@@ -13,21 +14,26 @@ PROJECT_QA_BOARD_ID = "5025911240"  # 2026 New Board Project QA
 
 
 def update_monday_item(board_id: str = PROJECT_QA_BOARD_ID, item_name: str = "", status: str = "", group_id: str = None) -> str:
-    group_part = f'group_id: "{group_id}"' if group_id else ""
-    mutation = f"""
-    mutation {{
+    mutation = """
+    mutation ($boardId: ID!, $itemName: String!, $groupId: String, $colVals: JSON) {
         create_item (
-            board_id: {board_id}
-            item_name: "{item_name}"
-            {group_part}
-            column_values: "{{\\"status\\": {{\\"label\\": \\"{status}\\"}} }}"
-        ) {{
+            board_id: $boardId
+            item_name: $itemName
+            group_id: $groupId
+            column_values: $colVals
+        ) {
             id
             name
-        }}
-    }}
+        }
+    }
     """
-    resp = requests.post(MONDAY_API_URL, json={"query": mutation}, headers=headers)
+    variables = {
+        "boardId": str(board_id),
+        "itemName": item_name,
+        "groupId": group_id,
+        "colVals": json.dumps({"status": {"label": status}}) if status else None,
+    }
+    resp = requests.post(MONDAY_API_URL, json={"query": mutation, "variables": variables}, headers=headers)
     resp.raise_for_status()
     data = resp.json()
     if "errors" in data:
