@@ -1,117 +1,164 @@
 import requests
 from requests.auth import HTTPBasicAuth
-from config import CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN, CONFLUENCE_SPACE_KEY
+from config import ATLASSIAN_URL, ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN
+
+auth = HTTPBasicAuth(ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN)
+headers = {"Accept": "application/json", "Content-Type": "application/json"}
+
+# Space constants
+KNOWLEDGE_SPACE = "~70121afebf570c9494abb86e687f692cf7d89"  # IT-ES Knowledge (read only)
+TESTCASE_SPACE = "ITK"  # ITES Testcase knowledge (write)
 
 
-def _auth():
-    return HTTPBasicAuth(CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN)
-
-
-def _headers():
-    return {"Accept": "application/json", "Content-Type": "application/json"}
-
-
-def get_page(page_id: str) -> dict:
-    url = f"{CONFLUENCE_BASE_URL}/wiki/rest/api/content/{page_id}?expand=body.storage"
-    resp = requests.get(url, auth=_auth(), headers=_headers())
+def get_confluence_pages(space_key: str, title_filter: str = "", limit: int = 25) -> str:
+    """Read pages from a Confluence space (e.g. IT-ES Knowledge)."""
+    params = {"spaceKey": space_key, "limit": limit, "expand": "body.storage,version"}
+    if title_filter:
+        params["title"] = title_filter
+    resp = requests.get(f"{ATLASSIAN_URL}/wiki/rest/api/content", params=params, auth=auth, headers=headers)
     resp.raise_for_status()
-    return resp.json()
+    results = resp.json().get("results", [])
+    if not results:
+        return f"ไม่พบหน้าใน space '{space_key}'"
+    lines = [f"พบ {len(results)} หน้าใน space '{space_key}':"]
+    for p in results:
+        lines.append(f"  - [{p['id']}] {p['title']}")
+    return "\n".join(lines)
 
 
-def search_pages(query: str, limit: int = 10) -> list:
-    url = f"{CONFLUENCE_BASE_URL}/wiki/rest/api/content/search"
-    params = {"cql": f'space="{CONFLUENCE_SPACE_KEY}" AND text~"{query}"', "limit": limit}
-    resp = requests.get(url, auth=_auth(), headers=_headers(), params=params)
+def get_confluence_page_content(page_id: str) -> str:
+    """Read full content of a Confluence page by ID."""
+    resp = requests.get(
+        f"{ATLASSIAN_URL}/wiki/rest/api/content/{page_id}",
+        params={"expand": "body.storage,version,title"},
+        auth=auth, headers=headers
+    )
     resp.raise_for_status()
-    return resp.json().get("results", [])
+    data = resp.json()
+    title = data.get("title", "")
+    version = data.get("version", {}).get("number", 1)
+    body = data.get("body", {}).get("storage", {}).get("value", "")
+    import re
+    text = re.sub(r"<[^>]+>", " ", body).strip()
+    text = re.sub(r"\s+", " ", text)
+    return f"Title: {title}\nVersion: {version}\nPage ID: {page_id}\n\nContent:\n{text}"
 
 
-def create_page(title: str, content: str, parent_id: str = None) -> dict:
-    url = f"{CONFLUENCE_BASE_URL}/wiki/rest/api/content"
+def search_knowledge_base(query: str, space_key: str = KNOWLEDGE_SPACE, limit: int = 10) -> str:
+    """Search IT-ES Knowledge space by keyword to find relevant content for test case creation."""
+    params = {
+        "cql": f'space = "{space_key}" AND text ~ "{query}" AND type = page',
+        "limit": limit,
+        "expand": "body.storage"
+    }
+    resp = requests.get(f"{ATLASSIAN_URL}/wiki/rest/api/search", params=params, auth=auth, headers=headers)
+    resp.raise_for_status()
+    results = resp.json().get("results", [])
+    if not results:
+        return f"ไม่พบข้อมูลที่เกี่ยวข้องกับ '{query}' ใน IT-ES Knowledge"
+    import re
+    lines = [f"พบ {len(results)} หน้าที่เกี่ยวข้องกับ '{query}':"]
+    for r in results:
+        content = r.get("excerpt", "")
+        content = re.sub(r"<[^>]+>", " ", content).strip()
+        lines.append(f"\n[{r['content']['id']}] {r['content']['title']}")
+        if content:
+            lines.append(f"  {content[:300]}...")
+    return "\n".join(lines)
+
+
+def create_confluence_page(space_key: str, title: str, content: str, parent_page_id: str = None) -> str:
+    """Create a new page in Confluence (default: ITES Testcase knowledge space)."""
     payload = {
         "type": "page",
         "title": title,
-        "space": {"key": CONFLUENCE_SPACE_KEY},
-        "body": {"storage": {"value": content, "representation": "storage"}},
+        "space": {"key": space_key},
+        "body": {"storage": {"value": f"<p>{content}</p>", "representation": "storage"}}
     }
-    if parent_id:
-        payload["ancestors"] = [{"id": parent_id}]
-    resp = requests.post(url, json=payload, auth=_auth(), headers=_headers())
+    if parent_page_id:
+        payload["ancestors"] = [{"id": parent_page_id}]
+    resp = requests.post(f"{ATLASSIAN_URL}/wiki/rest/api/content", json=payload, auth=auth, headers=headers)
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    page_url = f"{ATLASSIAN_URL}/wiki{data['_links']['webui']}"
+    return f"Created Confluence page: {data['id']} — {page_url}"
 
 
-def update_page(page_id: str, title: str, content: str, version: int) -> dict:
-    url = f"{CONFLUENCE_BASE_URL}/wiki/rest/api/content/{page_id}"
+def update_confluence_page(page_id: str, title: str, content: str, version: int) -> str:
     payload = {
         "version": {"number": version + 1},
         "title": title,
         "type": "page",
-        "body": {"storage": {"value": content, "representation": "storage"}},
+        "body": {"storage": {"value": f"<p>{content}</p>", "representation": "storage"}}
     }
-    resp = requests.put(url, json=payload, auth=_auth(), headers=_headers())
+    resp = requests.put(f"{ATLASSIAN_URL}/wiki/rest/api/content/{page_id}", json=payload, auth=auth, headers=headers)
     resp.raise_for_status()
-    return resp.json()
+    return f"Updated Confluence page {page_id} to version {version + 1}"
 
 
 CONFLUENCE_TOOLS = [
     {
-        "name": "confluence_get_page",
-        "description": "Get a Confluence page by its ID",
-        "input_schema": {
-            "type": "object",
-            "properties": {"page_id": {"type": "string"}},
-            "required": ["page_id"],
-        },
-    },
-    {
-        "name": "confluence_search_pages",
-        "description": "Search Confluence pages by keyword",
+        "name": "search_knowledge_base",
+        "description": "ค้นหาข้อมูลจาก IT-ES Knowledge space เพื่อนำไปสร้าง test cases",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string"},
-                "limit": {"type": "integer", "default": 10},
+                "query": {"type": "string", "description": "คำค้นหา เช่น 'login', 'payment', 'user registration'"},
+                "limit": {"type": "integer", "description": "จำนวนผลลัพธ์สูงสุด (default: 10)"}
             },
-            "required": ["query"],
-        },
+            "required": ["query"]
+        }
     },
     {
-        "name": "confluence_create_page",
-        "description": "Create a new Confluence page",
+        "name": "get_confluence_page_content",
+        "description": "อ่านเนื้อหาเต็มของ Confluence page เพื่อวิเคราะห์และสร้าง test cases",
         "input_schema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string"},
-                "content": {"type": "string", "description": "HTML or Confluence storage format"},
-                "parent_id": {"type": "string", "description": "Optional parent page ID"},
+                "page_id": {"type": "string", "description": "Page ID ที่ต้องการอ่าน"}
             },
-            "required": ["title", "content"],
-        },
+            "required": ["page_id"]
+        }
     },
     {
-        "name": "confluence_update_page",
-        "description": "Update an existing Confluence page",
+        "name": "get_confluence_pages",
+        "description": "ดูรายการหน้าทั้งหมดใน Confluence space",
         "input_schema": {
             "type": "object",
             "properties": {
-                "page_id": {"type": "string"},
-                "title": {"type": "string"},
-                "content": {"type": "string"},
-                "version": {"type": "integer", "description": "Current version number"},
+                "space_key": {"type": "string", "description": "Space key เช่น ITK หรือ space key ของ IT-ES Knowledge"},
+                "title_filter": {"type": "string", "description": "กรองตามชื่อหน้า (optional)"},
+                "limit": {"type": "integer", "description": "จำนวนสูงสุด (default: 25)"}
             },
-            "required": ["page_id", "title", "content", "version"],
-        },
+            "required": ["space_key"]
+        }
     },
+    {
+        "name": "create_confluence_page",
+        "description": "สร้าง test case page ใหม่ใน ITES Testcase knowledge (ITK) หลังจากอ่านข้อมูลจาก IT-ES Knowledge แล้ว",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "space_key": {"type": "string", "description": "Space key — ใช้ 'ITK' สำหรับ ITES Testcase knowledge"},
+                "title": {"type": "string", "description": "ชื่อ test case"},
+                "content": {"type": "string", "description": "เนื้อหา test case (steps, expected results)"},
+                "parent_page_id": {"type": "string", "description": "ID ของ parent page (optional)"}
+            },
+            "required": ["space_key", "title", "content"]
+        }
+    },
+    {
+        "name": "update_confluence_page",
+        "description": "อัปเดต test case page ที่มีอยู่แล้ว",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "page_id": {"type": "string", "description": "Page ID"},
+                "title": {"type": "string", "description": "ชื่อหน้า"},
+                "content": {"type": "string", "description": "เนื้อหาใหม่"},
+                "version": {"type": "integer", "description": "Version ปัจจุบัน"}
+            },
+            "required": ["page_id", "title", "content", "version"]
+        }
+    }
 ]
-
-
-def handle_confluence_tool(tool_name: str, tool_input: dict):
-    if tool_name == "confluence_get_page":
-        return get_page(**tool_input)
-    elif tool_name == "confluence_search_pages":
-        return search_pages(**tool_input)
-    elif tool_name == "confluence_create_page":
-        return create_page(**tool_input)
-    elif tool_name == "confluence_update_page":
-        return update_page(**tool_input)
