@@ -1,62 +1,64 @@
 import subprocess
 import json
-from pathlib import Path
+import os
+import re
+from config import BASE_URL
 
 
-def run_playwright_tests(spec_file: str = None, headed: bool = False) -> dict:
-    cmd = ["npx", "playwright", "test"]
-    if spec_file:
-        cmd.append(spec_file)
+def run_playwright_test(test_file: str = "", browser: str = "chromium", headed: bool = False, base_url: str = "") -> str:
+    valid_browsers = ["chromium", "firefox", "webkit"]
+    if browser not in valid_browsers:
+        return f"Invalid browser '{browser}'. Must be one of: {valid_browsers}"
+
+    if test_file and not re.match(r'^[\w\-/]+\.spec\.(ts|js)$', test_file):
+        return f"Invalid test_file '{test_file}'. Must match pattern: tests/name.spec.ts"
+    if test_file and (".." in test_file or test_file.startswith("/")):
+        return f"Invalid test_file: path traversal not allowed"
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url or BASE_URL
+
+    cmd = ["npx", "playwright", "test", "--reporter=json"]
+    if test_file:
+        cmd.append(test_file)
+    cmd += [f"--project={browser}"]
     if headed:
         cmd.append("--headed")
-    cmd += ["--reporter=json"]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent)
-    output = result.stdout
     try:
-        report = json.loads(output)
-    except json.JSONDecodeError:
-        report = {"raw": output, "stderr": result.stderr}
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
+        output = result.stdout or result.stderr
 
-    return {
-        "exit_code": result.returncode,
-        "passed": result.returncode == 0,
-        "report": report,
-    }
+        try:
+            report = json.loads(output)
+            stats = report.get("stats", {})
+            passed = stats.get("expected", 0)
+            failed = stats.get("unexpected", 0)
+            skipped = stats.get("skipped", 0)
+            return f"Playwright [{browser}]: {passed} passed, {failed} failed, {skipped} skipped\nExit code: {result.returncode}"
+        except json.JSONDecodeError:
+            lines = output.strip().split("\n")[-20:]
+            return "Playwright output:\n" + "\n".join(lines)
 
-
-def get_test_list() -> list:
-    cmd = ["npx", "playwright", "test", "--list", "--reporter=json"]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent)
-    try:
-        data = json.loads(result.stdout)
-        return data.get("suites", [])
-    except json.JSONDecodeError:
-        return []
+    except subprocess.TimeoutExpired:
+        return "Playwright test timed out after 120 seconds"
+    except FileNotFoundError:
+        return "Playwright not found. Run: npm install && npx playwright install"
 
 
 PLAYWRIGHT_TOOLS = [
     {
-        "name": "playwright_run_tests",
-        "description": "Run Playwright test suite and return results",
+        "name": "run_playwright_test",
+        "description": "รัน Playwright E2E tests และแสดงผลลัพธ์",
         "input_schema": {
             "type": "object",
             "properties": {
-                "spec_file": {"type": "string", "description": "Path to a specific spec file (optional)"},
-                "headed": {"type": "boolean", "default": False},
+                "test_file": {"type": "string", "description": "ชื่อไฟล์ test (เว้นว่างเพื่อรันทั้งหมด)"},
+                "browser": {"type": "string", "enum": ["chromium", "firefox", "webkit"], "description": "Browser ที่ใช้ทดสอบ"},
+                "headed": {"type": "boolean", "description": "แสดงหน้าต่าง browser หรือไม่"},
+                "base_url": {"type": "string", "description": "URL ของ application ที่ทดสอบ"}
             },
-        },
-    },
-    {
-        "name": "playwright_list_tests",
-        "description": "List all available Playwright tests without running them",
-        "input_schema": {"type": "object", "properties": {}},
-    },
+            "required": []
+        }
+    }
 ]
-
-
-def handle_playwright_tool(tool_name: str, tool_input: dict):
-    if tool_name == "playwright_run_tests":
-        return run_playwright_tests(**tool_input)
-    elif tool_name == "playwright_list_tests":
-        return get_test_list()
