@@ -1,85 +1,63 @@
+import urllib.parse
 import requests
-from config import VANSAH_API_TOKEN, VANSAH_BASE_URL
+from config import VANSAH_API_TOKEN, VANSAH_URL
+
+_ALLOWED_VANSAH_HOST = "prod.vansah.com"
+_REQUEST_TIMEOUT = 30
+
+headers = {
+    "Authorization": f"Bearer {VANSAH_API_TOKEN}",
+    "Content-Type": "application/json"
+}
 
 
-def _headers():
-    return {
-        "Authorization": f"Bearer {VANSAH_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
+def _validate_vansah_url(url: str) -> bool:
+    """Ensure VANSAH_URL points to the expected host to prevent SSRF."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        return parsed.scheme in ("https",) and parsed.netloc == _ALLOWED_VANSAH_HOST
+    except Exception:
+        return False
 
 
-def get_test_runs(project_key: str) -> list:
-    url = f"{VANSAH_BASE_URL}/testRuns"
-    params = {"projectKey": project_key}
-    resp = requests.get(url, headers=_headers(), params=params)
-    resp.raise_for_status()
-    return resp.json()
+def submit_test_result(test_case_key: str, status: str, comment: str = "", environment: str = "production") -> str:
+    valid_statuses = ["passed", "failed", "blocked", "untested"]
+    if status not in valid_statuses:
+        return f"Invalid status '{status}'. Must be one of: {valid_statuses}"
 
+    if not test_case_key or not test_case_key.strip():
+        return "test_case_key must not be empty"
 
-def add_test_result(test_run_id: str, test_case_key: str, status: str, comment: str = "") -> dict:
-    url = f"{VANSAH_BASE_URL}/testRuns/{test_run_id}/results"
+    if not _validate_vansah_url(VANSAH_URL):
+        return f"VANSAH_URL is invalid or points to an unexpected host. Expected: {_ALLOWED_VANSAH_HOST}"
+
     payload = {
-        "testCaseKey": test_case_key,
-        "status": status,
-        "comment": comment,
+        "testCaseKey": test_case_key.strip(),
+        "testRunStatus": status,
+        "environment": environment,
+        "comment": comment[:1000] if comment else ""
     }
-    resp = requests.post(url, json=payload, headers=_headers())
+    resp = requests.post(
+        f"{VANSAH_URL}/testRuns",
+        json=payload, headers=headers, timeout=_REQUEST_TIMEOUT
+    )
     resp.raise_for_status()
-    return resp.json()
-
-
-def create_test_run(project_key: str, name: str) -> dict:
-    url = f"{VANSAH_BASE_URL}/testRuns"
-    payload = {"projectKey": project_key, "name": name}
-    resp = requests.post(url, json=payload, headers=_headers())
-    resp.raise_for_status()
-    return resp.json()
+    return f"Submitted test result for {test_case_key}: {status} in {environment}"
 
 
 VANSAH_TOOLS = [
     {
-        "name": "vansah_get_test_runs",
-        "description": "Get all test runs for a project in Vansah",
-        "input_schema": {
-            "type": "object",
-            "properties": {"project_key": {"type": "string"}},
-            "required": ["project_key"],
-        },
-    },
-    {
-        "name": "vansah_create_test_run",
-        "description": "Create a new test run in Vansah",
+        "name": "submit_test_result",
+        "description": "บันทึกผลการทดสอบไปยัง Vansah Test Management",
         "input_schema": {
             "type": "object",
             "properties": {
-                "project_key": {"type": "string"},
-                "name": {"type": "string"},
+                "test_case_key": {"type": "string", "description": "Test case key เช่น TC-001"},
+                "status": {"type": "string", "enum": ["passed", "failed", "blocked", "untested"], "description": "ผลการทดสอบ"},
+                "comment": {"type": "string", "description": "หมายเหตุเพิ่มเติม (ไม่เกิน 1000 ตัวอักษร)"},
+                "environment": {"type": "string", "description": "สภาพแวดล้อมที่ทดสอบ เช่น production, staging"}
             },
-            "required": ["project_key", "name"],
-        },
-    },
-    {
-        "name": "vansah_add_test_result",
-        "description": "Add a test result to a Vansah test run",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "test_run_id": {"type": "string"},
-                "test_case_key": {"type": "string"},
-                "status": {"type": "string", "enum": ["PASSED", "FAILED", "BLOCKED", "UNTESTED"]},
-                "comment": {"type": "string"},
-            },
-            "required": ["test_run_id", "test_case_key", "status"],
-        },
-    },
+            "required": ["test_case_key", "status"]
+        }
+    }
 ]
-
-
-def handle_vansah_tool(tool_name: str, tool_input: dict):
-    if tool_name == "vansah_get_test_runs":
-        return get_test_runs(**tool_input)
-    elif tool_name == "vansah_create_test_run":
-        return create_test_run(**tool_input)
-    elif tool_name == "vansah_add_test_result":
-        return add_test_result(**tool_input)
