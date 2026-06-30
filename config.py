@@ -3,7 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+if not ANTHROPIC_API_KEY:
+    raise ValueError("ANTHROPIC_API_KEY is required but not set in environment")
 AGENT_ID = os.environ.get("AGENT_ID")
 
 ATLASSIAN_URL = os.environ.get("ATLASSIAN_URL")
