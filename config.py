@@ -3,59 +3,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+AGENT_ID = os.environ.get("AGENT_ID")
 
-JIRA_BASE_URL = os.getenv("JIRA_BASE_URL")
-JIRA_EMAIL = os.getenv("JIRA_EMAIL")
-JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
-JIRA_PROJECT_KEY = os.getenv("JIRA_PROJECT_KEY", "QA")
+ATLASSIAN_URL = os.environ.get("ATLASSIAN_URL")
+ATLASSIAN_EMAIL = os.environ.get("ATLASSIAN_EMAIL")
+ATLASSIAN_API_TOKEN = os.environ.get("ATLASSIAN_API_TOKEN")
 
-CONFLUENCE_BASE_URL = os.getenv("CONFLUENCE_BASE_URL")
-CONFLUENCE_EMAIL = os.getenv("CONFLUENCE_EMAIL")
-CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN")
-CONFLUENCE_SPACE_KEY = os.getenv("CONFLUENCE_SPACE_KEY")
+VANSAH_API_TOKEN = os.environ.get("VANSAH_API_TOKEN")
+VANSAH_URL = os.environ.get("VANSAH_URL", "https://prod.vansah.com/vansah-io/api/v1")
 
-VANSAH_API_TOKEN = os.getenv("VANSAH_API_TOKEN")
-VANSAH_BASE_URL = os.getenv("VANSAH_BASE_URL", "https://prod.vansah.com/api/v1")
+MONDAY_API_TOKEN = os.environ.get("MONDAY_API_TOKEN")
 
-MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-MONDAY_BOARD_ID = os.getenv("MONDAY_BOARD_ID")
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
-PLAYWRIGHT_BASE_URL = os.getenv("PLAYWRIGHT_BASE_URL", "http://localhost:3000")
-PLAYWRIGHT_HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "true").lower() == "true"
-PLAYWRIGHT_TIMEOUT = int(os.getenv("PLAYWRIGHT_TIMEOUT", "30000"))
-PLAYWRIGHT_SCREENSHOTS_DIR = os.getenv("PLAYWRIGHT_SCREENSHOTS_DIR", "./test-results/screenshots")
-
-CURSOR_AI_API_KEY = os.getenv("CURSOR_AI_API_KEY")
-CURSOR_AI_BASE_URL = os.getenv("CURSOR_AI_BASE_URL", "https://api.cursor.sh")
-
-AS400_HOST = os.getenv("AS400_HOST")
-AS400_PORT = int(os.getenv("AS400_PORT", "446"))
-AS400_USERNAME = os.getenv("AS400_USERNAME")
-AS400_PASSWORD = os.getenv("AS400_PASSWORD")
-AS400_LIBRARY = os.getenv("AS400_LIBRARY")
-AS400_DATABASE = os.getenv("AS400_DATABASE")
-
-JMETER_HOME = os.getenv("JMETER_HOME", "/usr/local/apache-jmeter")
-JMETER_RESULTS_DIR = os.getenv("JMETER_RESULTS_DIR", "./jmeter-results")
-JMETER_TEST_PLAN_DIR = os.getenv("JMETER_TEST_PLAN_DIR", "./jmeter-plans")
-JMETER_REMOTE_HOST = os.getenv("JMETER_REMOTE_HOST")
-
-K6_CLOUD_TOKEN = os.getenv("K6_CLOUD_TOKEN")
-K6_CLOUD_PROJECT_ID = os.getenv("K6_CLOUD_PROJECT_ID")
-K6_BASE_URL = os.getenv("K6_BASE_URL", "http://localhost:3000")
-K6_RESULTS_DIR = os.getenv("K6_RESULTS_DIR", "./k6-results")
-K6_VUS = int(os.getenv("K6_VUS", "10"))
-K6_DURATION = os.getenv("K6_DURATION", "30s")
-
-POSTMAN_API_KEY = os.getenv("POSTMAN_API_KEY")
-POSTMAN_WORKSPACE_ID = os.getenv("POSTMAN_WORKSPACE_ID")
-POSTMAN_COLLECTION_ID = os.getenv("POSTMAN_COLLECTION_ID")
-POSTMAN_ENVIRONMENT_ID = os.getenv("POSTMAN_ENVIRONMENT_ID")
-
-# Email / SMTP
-SMTP_HOST     = os.getenv("SMTP_HOST")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM     = os.getenv("SMTP_FROM", SMTP_USER or "qa-agent@noreply.com")
+BASE_URL = os.environ.get("BASE_URL", "https://example.com")
