@@ -1,9 +1,12 @@
 import anthropic
 import logging
+import re
 from config import ANTHROPIC_API_KEY, AGENT_ID
 
 logger = logging.getLogger(__name__)
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+_AGENT_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_\-]+$')
 
 
 def create_agent() -> str:
@@ -24,7 +27,7 @@ def create_agent() -> str:
         tools=[{"type": "agent_toolset_20260401"}],
         betas=["managed-agents-2026-04-01"]
     )
-    print(f"Agent created: {agent.id}")
+    logger.info(f"Agent created: {agent.id}")
     return agent.id
 
 
@@ -32,6 +35,8 @@ def run_session(user_input: str, session_metadata: dict = None) -> str:
     """Run an agent session and return the full response."""
     if not AGENT_ID:
         raise ValueError("AGENT_ID not set. Run create_agent() first and save the ID to .env")
+    if not _AGENT_ID_PATTERN.match(AGENT_ID):
+        raise ValueError("AGENT_ID format is invalid")
 
     full_response = []
 
@@ -45,7 +50,7 @@ def run_session(user_input: str, session_metadata: dict = None) -> str:
             for event in stream:
                 if event.type == "content_block_delta":
                     full_response.append(event.delta.text)
-                    print(event.delta.text, end="", flush=True)
+                    logger.debug("[agent response chunk received]")
                 elif event.type == "error":
                     logger.error(f"Stream error: {event.error}")
                     break
@@ -53,14 +58,15 @@ def run_session(user_input: str, session_metadata: dict = None) -> str:
         logger.error(f"API error: {e}")
         raise
 
-    print()
     return "".join(full_response)
 
 
 if __name__ == "__main__":
     import sys
+    logging.basicConfig(level=logging.INFO)
     if len(sys.argv) > 1 and sys.argv[1] == "create":
         agent_id = create_agent()
         print(f"\nAdd this to your .env:\nAGENT_ID={agent_id}")
     else:
         result = run_session("สวัสดี! ช่วยสรุปความสามารถของคุณให้หน่อย")
+        print(result)
